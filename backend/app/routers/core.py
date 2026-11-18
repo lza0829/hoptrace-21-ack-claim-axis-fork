@@ -3,10 +3,12 @@ from pydantic import BaseModel, Field
 
 from app.db import connect
 from app.modules.ack_cursor_tear import proof as ack_proof
+from app.modules.ack_cursor_tear import tear_audit as ack_audit
 from app.modules.ack_cursor_tear import service as ack
 from app.services import ingest as ingest_svc
 from app.services import timeline as timeline_svc
 from app.services.ack_demo import run_ordering_demo
+from app.services.promotion_demo import run_promotion_tear_demo
 
 router = APIRouter(prefix="/api")
 
@@ -71,6 +73,7 @@ def waybill_timeline(waybill_id: str):
             (waybill_id,),
         ).fetchone()
         fork_proof = ack_proof.build_fork_proof(conn, waybill_id)
+        tear_audit = ack_audit.build_promotion_tear_audit(conn, waybill_id)
         return {
             "waybill": dict(wb),
             "hops": formal,
@@ -78,6 +81,7 @@ def waybill_timeline(waybill_id: str):
             "pending_hops": pending,
             "ack_cursor": cursor,
             "fork_proof": fork_proof,
+            "tear_audit": tear_audit,
             "proof": dict(proof) if proof else None,
         }
     finally:
@@ -103,7 +107,40 @@ def advance_ack(waybill_id: str, body: AckAdvanceBody):
             conn.rollback()
             raise HTTPException(500, f"ACK 推进触发失败闭回滚：{e}")
         result["fork_proof"] = ack_proof.build_fork_proof(conn, waybill_id)
+        result["tear_audit"] = ack_audit.build_promotion_tear_audit(conn, waybill_id)
         return result
+    finally:
+        conn.close()
+
+
+@router.get("/promotion-tear-audits")
+def promotion_tear_audits(waybill_id: str | None = None):
+    """晋升撕裂核证（只读）：回执晋升点是否已在正式轴、投影是否随晋升前进、
+    待确认是否被无回执清空。基线所无的核证接口，供证明页 / 待确认页协同复核。"""
+    conn = connect()
+    try:
+        if waybill_id:
+            wb = conn.execute("SELECT 1 FROM waybills WHERE id=?", (waybill_id,)).fetchone()
+            if not wb:
+                raise HTTPException(404, "运单不存在")
+            return ack_audit.build_promotion_tear_audit(conn, waybill_id)
+        return ack_audit.list_promotion_tear_audits(conn)
+    finally:
+        conn.close()
+
+
+@router.get("/promotion-proofs")
+def promotion_proofs(waybill_id: str | None = None):
+    """晋升回执列表（独立晋升对照 / 撕裂证明表）。"""
+    conn = connect()
+    try:
+        if waybill_id:
+            wb = conn.execute("SELECT 1 FROM waybills WHERE id=?", (waybill_id,)).fetchone()
+            if not wb:
+                raise HTTPException(404, "运单不存在")
+            return ack_audit.list_promotion_receipts(conn, waybill_id)
+        rows = [r["id"] for r in conn.execute("SELECT id FROM waybills ORDER BY id").fetchall()]
+        return [rec for wid in rows for rec in ack_audit.list_promotion_receipts(conn, wid)]
     finally:
         conn.close()
 
@@ -137,6 +174,12 @@ def pending_hops(waybill_id: str | None = None):
 def ack_ordering_demo():
     """先装载后 ACK vs 先 ACK 后装载 对照（独立临时库，只读演示）。"""
     return run_ordering_demo()
+
+
+@router.get("/promotion-demo/tear")
+def promotion_tear_demo():
+    """晋升撕裂对照：先装超游标点再上调 ACK 的成功 / 失败两条路径（独立临时库）。"""
+    return run_promotion_tear_demo()
 
 
 @router.get("/quarantine")

@@ -2,9 +2,19 @@
 
 证明字段：运单、ack_seq、正式最大序号、待确认键集合、结论。
 结论由持久化数据即时推导，不接受外部传参，保证只读可信。
+
+晋升撕裂核证见 tear_audit.py；本模块把晋升回执挂到分叉证明上，
+供证明页 / 待确认页按同一份持久化数据协同复核。
 """
 
 from app.modules.ack_cursor_tear.service import ensure_cursor, get_cursor
+from app.modules.ack_cursor_tear.tear_audit import list_promotion_receipts
+
+__all__ = [
+    "build_fork_proof",
+    "list_fork_proofs",
+    "list_promotion_receipts",
+]
 
 
 def _conclusion(ack_seq: int, formal_max: int, pending_keys: list[str]) -> str:
@@ -42,6 +52,8 @@ def build_fork_proof(conn, waybill_id: str) -> dict:
         (waybill_id, cur["ack_seq"]),
     ).fetchone()["c"]
 
+    receipts = list_promotion_receipts(conn, waybill_id)
+
     return {
         "waybill_id": waybill_id,
         "waybill_title": wb["title"],
@@ -53,6 +65,8 @@ def build_fork_proof(conn, waybill_id: str) -> dict:
         "pending_detail": [dict(r) for r in pending],
         "over_ack_formal_count": over_ack,
         "conclusion": _conclusion(cur["ack_seq"], formal_max, pending_keys),
+        "promotion_receipt_count": len(receipts),
+        "last_promotion_receipt": receipts[-1] if receipts else None,
         "version": cur["version"],
         "updated_at": cur["updated_at"],
     }

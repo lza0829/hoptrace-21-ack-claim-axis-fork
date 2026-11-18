@@ -31,6 +31,11 @@ export const api = {
     }),
   forkProofs: (waybillId) =>
     req(waybillId ? `/api/ack-fork-proofs?waybill_id=${encodeURIComponent(waybillId)}` : '/api/ack-fork-proofs'),
+  promotionProofs: (waybillId) =>
+    req(waybillId ? `/api/promotion-proofs?waybill_id=${encodeURIComponent(waybillId)}` : '/api/promotion-proofs'),
+  tearAudits: (waybillId) =>
+    req(waybillId ? `/api/promotion-tear-audits?waybill_id=${encodeURIComponent(waybillId)}` : '/api/promotion-tear-audits'),
+  promotionTearDemo: () => req('/api/promotion-demo/tear'),
   pendingHops: (waybillId) =>
     req(waybillId ? `/api/pending-hops?waybill_id=${encodeURIComponent(waybillId)}` : '/api/pending-hops'),
   ackOrderingDemo: () => req('/api/ack-demo/ordering'),

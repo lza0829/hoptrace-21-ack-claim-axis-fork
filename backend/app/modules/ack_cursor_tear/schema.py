@@ -1,9 +1,13 @@
 """ACK 游标 / 待确认点落库结构（SQLite）。
 
 形态：ack 表 + 待确认表（两种允许形态中择一），禁止只在内存比较游标。
-  ack_cursors  —— 每运单一行：持久 ACK 游标 ack_seq、正式物化进度 formal_max_seq、版本号
-  pending_hops —— 待 ACK 区：装载时被闸下的点，晋升成功后删除
-  formal_hops  —— 正式有效轴视图：仅 retracted=0、primary、已被 ACK 覆盖（seq <= ack_seq）的点
+  ack_cursors      —— 每运单一行：持久 ACK 游标 ack_seq、正式物化进度 formal_max_seq、版本号
+  pending_hops     —— 待 ACK 区：装载时被闸下的点，晋升成功后删除
+  formal_hops      —— 正式有效轴视图：仅 retracted=0、primary、已被 ACK 覆盖（seq <= ack_seq）的点
+  promotion_proofs —— 独立晋升对照 / 撕裂证明表：运单 + 晋升点 id 列表 + 投影前后 + 正式轴增量
+
+晋升持久化形态（择一）：独立晋升对照 / 撕裂证明表（本实现），不以运单行快照列代替。
+提交形态（择一）：同事务删待确认并确保正式轴可见且重算投影，缺一回滚（本实现）。
 """
 
 SCHEMA = """
@@ -27,6 +31,27 @@ CREATE TABLE IF NOT EXISTS pending_hops (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pending_waybill ON pending_hops(waybill_id, seq);
+
+-- 独立晋升对照 / 撕裂证明表：运单 + 晋升 id 列表 + 投影前后 + 正式轴前后计数。
+-- 每次成功晋升写一行，与删除待确认 / 重算投影同事务；回执必须可被本表核验。
+CREATE TABLE IF NOT EXISTS promotion_proofs (
+  promo_id TEXT PRIMARY KEY,
+  waybill_id TEXT NOT NULL REFERENCES waybills(id),
+  previous_ack_seq INTEGER NOT NULL,
+  ack_seq INTEGER NOT NULL,
+  promoted_ids_json TEXT NOT NULL,
+  promoted_count INTEGER NOT NULL,
+  formal_count_before INTEGER NOT NULL,
+  formal_max_before INTEGER NOT NULL,
+  formal_count_after INTEGER NOT NULL,
+  formal_max_after INTEGER NOT NULL,
+  projection_before TEXT NOT NULL,
+  projection_after TEXT NOT NULL,
+  pending_after_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotion_waybill ON promotion_proofs(waybill_id);
 
 CREATE VIEW IF NOT EXISTS formal_hops AS
 SELECT h.id, h.waybill_id, h.event_ts, h.location_code, h.event_code, h.seq,

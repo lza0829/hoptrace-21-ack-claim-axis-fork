@@ -1,0 +1,39 @@
+{
+  "waybill": {
+    "id": "WB-PROMO-1",
+    "title": "晋升对照样件",
+    "created_at": "2026-11-18T07:00:00Z"
+  },
+  "initial_ack_seq": 0,
+  "advance_to": 3,
+  "hops": [
+    {
+      "id": "P-1",
+      "event_ts": "2026-11-18T08:00:00Z",
+      "location_code": "SHA-HUB",
+      "event_code": "PICKED",
+      "seq": 1
+    },
+    {
+      "id": "P-2",
+      "event_ts": "2026-11-18T10:30:00Z",
+      "location_code": "NJ-HUB",
+      "event_code": "IN_TRANSIT",
+      "seq": 2
+    },
+    {
+      "id": "P-3",
+      "event_ts": "2026-11-18T13:15:00Z",
+      "location_code": "HZ-HUB",
+      "event_code": "ARRIVED_HUB",
+      "seq": 3
+    },
+    {
+      "id": "P-4",
+      "event_ts": "2026-11-18T17:40:00Z",
+      "location_code": "HZ-STATION",
+      "event_code": "OUT_FOR_DELIVERY",
+      "seq": 4
+    }
+  ]
+}

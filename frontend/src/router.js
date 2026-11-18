@@ -10,7 +10,7 @@ export default createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Board },
-    { path: '/ingest', component: Ingest.vue },
+    { path: '/ingest', component: Ingest },
     { path: '/ack', component: AckCursor },
     { path: '/sidecar', component: Sidecar },
     { path: '/quarantine', component: Quarantine },

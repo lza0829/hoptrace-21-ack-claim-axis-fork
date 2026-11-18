@@ -63,6 +63,8 @@ const pending = computed(() => detail.value?.pending_hops || [])
 const allPoints = computed(() => detail.value?.all_points || [])
 const proof = computed(() => detail.value?.proof)
 const fork = computed(() => detail.value?.fork_proof)
+const tear = computed(() => detail.value?.tear_audit)
+const lastReceipt = computed(() => detail.value?.tear_audit?.promotion_receipts?.at(-1))
 const cursor = computed(() => detail.value?.ack_cursor)
 </script>
 
@@ -159,6 +161,25 @@ const cursor = computed(() => detail.value?.ack_cursor)
           <dt>待确认键集合</dt><dd>{{ fork.pending_keys.join(', ') || '∅' }}</dd>
           <dt>结论</dt><dd class="conclusion">{{ fork.conclusion }}</dd>
         </dl>
+
+        <h2>晋升撕裂核证</h2>
+        <dl class="kv" v-if="tear">
+          <dt>核证</dt>
+          <dd :class="tear.tear ? 'ack-bad' : 'ack-ok'">{{ tear.verdict }}</dd>
+          <dt>晋升回执数</dt><dd>{{ tear.promotion_receipts.length }}</dd>
+          <template v-if="lastReceipt">
+            <dt>末条回执</dt><dd class="mono">{{ lastReceipt.promo_id }}</dd>
+            <dt>晋升 id 列表</dt><dd>{{ lastReceipt.promoted_ids.join(', ') || '∅' }}</dd>
+            <dt>正式点数 前→后</dt>
+            <dd class="mono">{{ lastReceipt.formal_count_before }} → {{ lastReceipt.formal_count_after }}</dd>
+            <dt>投影 前→后</dt>
+            <dd class="mono">{{ lastReceipt.projection_before }} → {{ lastReceipt.projection_after }}</dd>
+          </template>
+        </dl>
+        <p v-if="tear && tear.violations.length" class="ack-bad small">
+          <span v-for="v in tear.violations" :key="v" class="tear-line">{{ v }}</span>
+        </p>
+        <p v-else-if="!tear" class="muted">暂无核证</p>
 
         <h2>状态证明</h2>
         <dl class="kv" v-if="proof">
